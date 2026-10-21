@@ -1,0 +1,2279 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>經典復古小瑪莉 - 麻仔台街機模擬器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cabinet-red: #b91c1c;
+            --cabinet-gold: #f59e0b;
+            --led-red: #ff1e1e;
+            --led-dim: #3a0909;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: radial-gradient(circle at center, #1e293b 0%, #090d16 100%);
+            user-select: none;
+            -webkit-user-select: none;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        /* 數位七段顯示器字體與發光效果 */
+        .seven-seg {
+            font-family: 'Share Tech Mono', 'Orbitron', monospace;
+            color: var(--led-red);
+            background-color: #140303;
+            text-shadow: 0 0 8px rgba(255, 30, 30, 0.8), 0 0 15px rgba(255, 50, 50, 0.5);
+            border: 2px inset #334155;
+            box-shadow: inset 0 0 10px #000000;
+            letter-spacing: 1px;
+        }
+
+        @media (min-width: 640px) {
+            .seven-seg {
+                border-width: 3px;
+                letter-spacing: 2px;
+            }
+        }
+
+        .power-off .seven-seg {
+            color: #2a0808 !important;
+            text-shadow: none !important;
+        }
+
+        /* 機台外框木紋與金屬質感 (支援白色/街機金屬面板) */
+        .arcade-cabinet {
+            background: linear-gradient(145deg, #f8fafc 0%, #e2e8f0 45%, #94a3b8 100%);
+            border: 4px solid #475569;
+            box-shadow: 
+                0 15px 40px rgba(0, 0, 0, 0.9),
+                inset 0 0 15px rgba(255, 255, 255, 0.8),
+                0 0 15px rgba(0, 0, 0, 0.4);
+        }
+
+        @media (min-width: 640px) {
+            .arcade-cabinet {
+                border-width: 6px;
+                box-shadow: 
+                    0 25px 60px rgba(0, 0, 0, 0.9),
+                    inset 0 0 20px rgba(255, 255, 255, 0.8),
+                    0 0 20px rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        .panel-arcade-black {
+            background: radial-gradient(circle at 50% 30%, #1e293b 0%, #090d16 100%);
+            border: 3px solid #ca8a04;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.9), 0 4px 12px rgba(0,0,0,0.6);
+        }
+
+        @media (min-width: 640px) {
+            .panel-arcade-black {
+                border-width: 4px;
+            }
+        }
+
+        .panel-metal {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            border: 2px solid #475569;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        /* 7x7 跑馬燈網格設定（手機與寬平板適配動態 gap） */
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            grid-template-rows: repeat(7, minmax(0, 1fr));
+            gap: 2.5px;
+            aspect-ratio: 1 / 1;
+            width: 100%;
+        }
+
+        @media (min-width: 400px) {
+            .board-grid {
+                gap: 3.5px;
+            }
+        }
+
+        @media (min-width: 640px) {
+            .board-grid {
+                gap: 5px;
+            }
+        }
+
+        /* 跑馬燈格子樣式 (白底黑字復古台) */
+        .slot-cell {
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 4px;
+            position: relative;
+            transition: all 0.05s ease;
+            box-shadow: inset 0 0 3px rgba(0,0,0,0.15);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1px;
+        }
+
+        @media (min-width: 640px) {
+            .slot-cell {
+                border-width: 2px;
+                border-radius: 6px;
+                padding: 2px;
+            }
+        }
+
+        .slot-cell.special-bar {
+            background: #ffffff;
+            border-color: #3b82f6;
+        }
+
+        .slot-cell.special-lucky-red {
+            background: #ffffff;
+            border-color: #ef4444;
+        }
+
+        .slot-cell.special-lucky-green {
+            background: #ffffff;
+            border-color: #10b981;
+        }
+
+        /* 格子內緣圓形紅色實體 LED 指示燈 (動態縮放) */
+        .slot-led {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #991b1b, #450a0a);
+            border: 1px solid #1c0202;
+            box-shadow: inset 0 1px 1px rgba(0,0,0,0.8), 0 1px 1px rgba(255,255,255,0.2);
+            transition: all 0.05s ease;
+            z-index: 25;
+            pointer-events: none;
+        }
+
+        @media (min-width: 480px) {
+            .slot-led {
+                width: 9px;
+                height: 9px;
+            }
+        }
+
+        @media (min-width: 640px) {
+            .slot-led {
+                width: 11px;
+                height: 11px;
+            }
+        }
+
+        /* 跑馬燈亮起狀態 */
+        .slot-cell.active-light {
+            background: #fefce8 !important;
+            border-color: #ef4444 !important;
+            box-shadow: 
+                0 0 10px rgba(239, 68, 68, 0.8),
+                inset 0 0 6px rgba(251, 191, 36, 0.6) !important;
+            transform: scale(1.03);
+            z-index: 20;
+        }
+
+        /* 當前格子亮起時，其內緣圓形 LED 爆亮鮮紅光 */
+        .slot-cell.active-light .slot-led {
+            background: radial-gradient(circle at 35% 35%, #ffffff 0%, #ff4d4d 30%, #ef4444 65%, #b91c1c 100%) !important;
+            border-color: #fecaca !important;
+            box-shadow: 
+                0 0 6px #ff1e1e,
+                0 0 12px #ff2222,
+                0 0 20px #ef4444,
+                inset 0 0 2px #ffffff !important;
+            transform: scale(1.3);
+        }
+
+        /* 關機時的跑馬燈格與 LED */
+        .power-off .slot-cell {
+            filter: brightness(0.25) grayscale(0.8);
+            box-shadow: none !important;
+            transform: none !important;
+        }
+        .power-off .slot-led {
+            background: #1e0505 !important;
+            box-shadow: none !important;
+            border-color: #000000 !important;
+        }
+
+        /* 街機立體實體按鈕 */
+        .arcade-btn {
+            transition: all 0.08s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            top: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .arcade-btn:active:not(:disabled),
+        .arcade-btn.pressed {
+            top: 2px;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.8) !important;
+        }
+
+        .arcade-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        /* 白色街機微動實體按鈕 */
+        .btn-arcade-white {
+            background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 55%, #cbd5e1 100%);
+            border: 1.5px solid #ffffff;
+            box-shadow: 0 3px 0 #475569, 0 4px 6px rgba(0,0,0,0.6);
+            color: #0f172a;
+        }
+
+        @media (min-width: 640px) {
+            .btn-arcade-white {
+                border-width: 2px;
+                box-shadow: 0 4px 0 #475569, 0 5px 8px rgba(0,0,0,0.6);
+            }
+        }
+
+        .btn-arcade-white:active:not(:disabled) {
+            top: 2px;
+            box-shadow: 0 1px 0 #475569, 0 2px 3px rgba(0,0,0,0.6) !important;
+        }
+
+        .btn-red {
+            background: radial-gradient(circle at 30% 30%, #ef4444, #991b1b);
+            border: 2px solid #fca5a5;
+            box-shadow: 0 4px 0 #450a0a, 0 5px 8px rgba(0,0,0,0.6);
+        }
+
+        .btn-yellow {
+            background: radial-gradient(circle at 30% 30%, #fde047, #ca8a04);
+            border: 2px solid #fef08a;
+            box-shadow: 0 4px 0 #713f12, 0 5px 8px rgba(0,0,0,0.6);
+        }
+
+        .btn-blue {
+            background: radial-gradient(circle at 30% 30%, #3b82f6, #1d4ed8);
+            border: 2px solid #93c5fd;
+            box-shadow: 0 4px 0 #1e3a8a, 0 5px 8px rgba(0,0,0,0.6);
+        }
+
+        .btn-green {
+            background: radial-gradient(circle at 30% 30%, #22c55e, #15803d);
+            border: 2px solid #86efac;
+            box-shadow: 0 4px 0 #14532d, 0 5px 8px rgba(0,0,0,0.6);
+        }
+
+        .btn-metal {
+            background: linear-gradient(180deg, #e2e8f0 0%, #94a3b8 100%);
+            border: 2px solid #f8fafc;
+            box-shadow: 0 4px 0 #334155, 0 5px 8px rgba(0,0,0,0.6);
+            color: #0f172a;
+        }
+
+        /* 閃爍動畫 */
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.55; transform: scale(0.97); }
+        }
+        .animate-blink {
+            animation: pulse-fast 0.5s infinite;
+        }
+
+        /* 退幣掉落動畫 */
+        @keyframes coin-drop {
+            0% { transform: translateY(-20px) scale(0.8); opacity: 1; }
+            70% { transform: translateY(25px) scale(1.1); opacity: 1; }
+            100% { transform: translateY(45px) scale(0.9); opacity: 0; }
+        }
+        .coin-particle {
+            animation: coin-drop 0.6s ease-in forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start sm:justify-center p-1.5 sm:p-4 text-white">
+
+    <div id="machineRoot" class="arcade-cabinet w-full max-w-xl mx-auto rounded-2xl sm:rounded-3xl p-2 sm:p-4 flex flex-col gap-2 sm:gap-2.5 relative">
+        
+        <!-- 頂部管理與店員側邊鎖匙區（電源、音效、開分、消分、投幣、水箱/咬度設定） -->
+        <div class="panel-metal rounded-xl p-2 flex flex-col gap-1.5 text-xs">
+            <div class="flex items-center justify-between flex-wrap gap-1.5">
+                <div class="flex items-center gap-1.5">
+                    <!-- 電源開關 (連點 3 次指示燈可喚出暗碼輸入) -->
+                    <button id="btnPower" onclick="handlePowerClick()" class="flex items-center gap-1 px-2.5 py-1 rounded bg-red-900 hover:bg-red-800 border border-red-400 font-bold shadow text-[11px] sm:text-xs">
+                        <span id="powerIndicator" class="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]"></span>
+                        <span>電源</span>
+                    </button>
+                    <!-- 音效開關 -->
+                    <button id="btnMute" onclick="toggleMute()" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-amber-300 font-bold text-[11px] sm:text-xs" title="切換音效">
+                        🔊 音效
+                    </button>
+                </div>
+
+                <!-- 投幣與開分消分 (開分/消分預設隱藏，需暗碼 885 解鎖) -->
+                <div class="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                    <button id="btnInsertCoin" onclick="insertCoin()" class="arcade-btn btn-yellow text-slate-950 font-black px-2.5 py-1 rounded text-[11px] sm:text-xs">
+                        🪙 投幣 (+10)
+                    </button>
+                    <!-- 開分與消分選項預設隱藏，與暗碼 885 一併解鎖開啟 -->
+                    <div id="adminScoreButtons" class="hidden items-center gap-1">
+                        <button id="btnKeyIn" onclick="keyInScore()" class="arcade-btn btn-metal font-bold px-2 py-1 rounded text-[11px] sm:text-xs border border-cyan-500/60" title="店家專用：開分(+100)">
+                            🔑 開分
+                        </button>
+                        <button id="btnKeyOut" onclick="keyOutScore()" class="arcade-btn btn-metal font-bold px-2 py-1 rounded text-[11px] sm:text-xs border border-cyan-500/60" title="店家專用：消分(-100)">
+                            🗝️ 消分
+                        </button>
+                    </div>
+                    <button onclick="toggleHelpModal(true)" class="px-2 py-1 rounded bg-amber-700 hover:bg-amber-600 border border-amber-400 font-bold text-[11px] sm:text-xs">
+                        📖 說明
+                    </button>
+                </div>
+            </div>
+
+            <!-- 機台水箱與咬度即時監控列 (預設隱藏，需輸入暗碼 885 開啟) -->
+            <div id="tankMonitorBar" class="hidden bg-black/85 rounded px-2 py-1.5 flex items-center justify-between text-[10px] sm:text-[11px] border border-cyan-500/50 font-mono shadow-inner transition-all">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-amber-300 font-bold flex items-center gap-1">
+                        <span class="text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-600 px-1 rounded">後台</span>
+                        <span>咬度:</span>
+                    </span>
+                    <select id="selectDifficulty" onchange="changeDifficulty(this.value)" class="bg-slate-900 text-yellow-300 border border-slate-700 rounded px-1 py-0.5 text-[10px] sm:text-xs font-bold outline-none cursor-pointer">
+                        <option value="loose">吐分期 (RTP 98%)</option>
+                        <option value="standard" selected>標準街機 (RTP 92%)</option>
+                        <option value="tight">吃分期 (RTP 80%)</option>
+                    </select>
+                    <!-- 單純測試送燈按鈕 (預設完全隱藏，僅在暗碼 885 後台中顯示) -->
+                    <button onclick="testShootLights()" class="text-[9px] sm:text-[10px] bg-emerald-800 hover:bg-emerald-700 active:scale-95 text-emerald-100 font-bold border border-emerald-500/80 px-1.5 py-0.5 rounded shadow transition-all ml-1" title="單純測試綠色 ONCE MORE 逐次送 1~5 燈">🎯 測試送燈</button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span title="機台水箱目前累計總分，水箱充盈時大獎與送燈機率大增">
+                        💧 水箱: <b id="displayWaterPool" class="text-cyan-400">300</b>
+                    </span>
+                    <button onclick="quickFillWater()" class="text-[9px] text-emerald-400 underline hover:text-emerald-300" title="手動注水 +200">+注水</button>
+                    <span class="text-slate-400">RTP: <b id="displayRTP" class="text-amber-400">0.0%</b></span>
+                    <!-- 快速隱藏/鎖定後台按鍵 -->
+                    <button onclick="toggleAdminPanel(false)" class="text-slate-400 hover:text-rose-400 font-bold text-xs ml-1" title="鎖定並隱藏後台">✕</button>
+                </div>
+            </div>
+
+            <!-- 人氣街機熱門連線看板 (即時在線人數與累積瀏覽量) -->
+            <div class="bg-gradient-to-r from-red-950/80 via-black to-slate-950/80 rounded px-2 py-0.5 flex items-center justify-between text-[10px] sm:text-[11px] border border-red-500/30 font-mono">
+                <div class="flex items-center gap-1.5">
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-slate-300">在線玩家:</span>
+                    <b id="livePlayersCount" class="text-emerald-400 font-bold">186</b>
+                    <span class="text-[9px] text-slate-500">人</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="text-slate-400">👁️ 累計造訪:</span>
+                    <b id="totalVisitorsCount" class="text-amber-400 font-bold">15,820</b>
+                    <span class="text-[9px] text-slate-500">人次</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 雙數位顯示面板：BONUS WIN 與 CREDIT + 投幣面板 -->
+        <div class="grid grid-cols-12 gap-2 sm:gap-3 bg-black/85 p-2 sm:p-3 rounded-2xl border-2 border-amber-600/80 shadow-inner items-center">
+            <!-- BONUS WIN 顯示器 -->
+            <div class="col-span-5 flex flex-col items-center">
+                <div class="flex items-center gap-1.5 mb-0.5">
+                    <span class="text-rose-400 font-black tracking-widest text-[11px] sm:text-xs">BONUS WIN</span>
+                </div>
+                <div id="displayWin" class="seven-seg w-full text-center text-2xl sm:text-4xl py-1 px-2 rounded-lg font-bold">
+                    00000
+                </div>
+            </div>
+
+            <!-- CREDIT 顯示器 -->
+            <div class="col-span-5 flex flex-col items-center">
+                <div class="flex items-center gap-1.5 mb-0.5">
+                    <span class="text-amber-400 font-black tracking-widest text-[11px] sm:text-xs">CREDIT</span>
+                </div>
+                <div id="displayCredit" class="seven-seg w-full text-center text-2xl sm:text-4xl py-1 px-2 rounded-lg font-bold">
+                    00100
+                </div>
+            </div>
+
+            <!-- 街機金屬投幣孔模組 -->
+            <div class="col-span-2 flex flex-col items-center justify-center bg-slate-200 border-2 border-slate-400 rounded-lg p-1 sm:p-1.5 text-slate-800 shadow cursor-pointer hover:bg-slate-100 active:scale-95 transition" onclick="insertCoin()" title="點擊投幣 (+10)">
+                <div class="w-1.5 sm:w-2 h-7 sm:h-8 bg-slate-900 border border-slate-700 rounded-sm flex items-center justify-center shadow-inner my-0.5">
+                    <div class="w-0.5 h-5 bg-black"></div>
+                </div>
+                <span class="text-[9px] font-black text-blue-700 leading-none">🪙 投幣</span>
+            </div>
+        </div>
+
+        <!-- 24格 7x7 外圍跑馬燈與中央比大小控制台 -->
+        <div class="panel-arcade-black p-2 sm:p-3 rounded-2xl relative">
+            <div id="boardGrid" class="board-grid w-full">
+                <!-- 由 JS 動態生成外圍 24 格（含內緣紅色圓形 LED 指示燈）與中央 5x5 顯示區 -->
+                <div id="centerConsole" class="col-start-2 col-end-7 row-start-2 row-end-7 bg-gradient-to-b from-sky-900 via-slate-950 to-black rounded-xl border-2 border-amber-400 p-2 sm:p-3 flex flex-col justify-between items-center text-center relative overflow-hidden shadow-inner">
+                    
+                    <!-- 頂部復古標牌 -->
+                    <div class="w-full border-b border-amber-500/40 pb-1 flex items-center justify-between px-1">
+                        <span class="text-xs sm:text-sm font-black text-amber-300 drop-shadow tracking-wider">★ 小瑪莉 MARIO ★</span>
+                        <span id="machineCoinStock" class="text-[10px] text-emerald-400 font-mono">機內硬幣: 500</span>
+                    </div>
+
+                    <!-- 中央狀態與比大小點數顯示器 -->
+                    <div class="flex flex-col items-center justify-center my-auto w-full px-1">
+                        <div id="statusBanner" class="text-yellow-300 font-black text-xs sm:text-base tracking-wide mb-1 min-h-[1.5rem] flex items-center justify-center">
+                            請在下方選擇水果押分或按 START！
+                        </div>
+
+                        <!-- 比大小 (1~13) 專用顯示區 -->
+                        <div class="flex items-center justify-center gap-2 sm:gap-4 w-full my-1">
+                            <div class="flex flex-col items-center">
+                                <span class="text-[10px] sm:text-xs text-sky-300 font-bold">小 (1~6)</span>
+                                <span class="text-[9px] text-sky-400 font-mono">2X翻倍</span>
+                            </div>
+
+                            <!-- 中央數位點數機 (01~13) -->
+                            <div class="flex flex-col items-center">
+                                <span class="text-[9px] text-amber-300 font-bold mb-0.5">比倍點數 (7保送)</span>
+                                <div id="displayDice" class="seven-seg w-14 sm:w-20 text-center text-xl sm:text-3xl py-1 rounded-lg font-black">
+                                    07
+                                </div>
+                            </div>
+
+                            <div class="flex flex-col items-center">
+                                <span class="text-[10px] sm:text-xs text-rose-300 font-bold">大 (8~13)</span>
+                                <span class="text-[9px] text-rose-400 font-mono">2X翻倍</span>
+                            </div>
+                        </div>
+
+                        <p id="subStatusText" class="text-[10px] sm:text-[11px] text-slate-300">
+                            開出 7 點保送翻倍！未改押注按 START 可延續上局
+                        </p>
+                    </div>
+
+                    <!-- 瑪莉歐復古裝飾底線 -->
+                    <div class="w-full text-[9px] text-amber-400/80 border-t border-amber-500/30 pt-0.5 flex justify-between px-2 font-mono">
+                        <span>INSERT COIN</span>
+                        <span>TAIWAN ARCADE</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8 大圖案官方賠率與七段 LED 押分顯示條 (還原實體照正下方橫列) -->
+        <div class="bg-black/90 p-2 rounded-xl border-2 border-amber-500/90 shadow-lg">
+            <div id="oddsLedDisplayBar" class="grid grid-cols-8 gap-1 text-center">
+                <!-- 由 JS 動態生成 8 門圖標、賠率標籤、紅 LED 與七段押分值 -->
+            </div>
+        </div>
+
+        <!-- 實體按鍵操作台 (還原 pic.jpg 之黑底黃框兩列式配置) -->
+        <div class="bg-gradient-to-b from-slate-950 to-black p-2.5 sm:p-3.5 rounded-2xl border-4 border-amber-500 shadow-2xl flex flex-col gap-2">
+            
+            <!-- 第一列：功能按鈕群 (PAY | WIN↔CREDIT | SMALL 1-6 | DOUBLE UP | BIG 8-13 | START) -->
+            <div class="grid grid-cols-6 gap-1 sm:gap-2 items-center bg-slate-900/90 p-1.5 sm:p-2 rounded-xl border border-amber-500/50">
+                <!-- PAY 退幣 -->
+                <div class="flex flex-col items-center min-w-0">
+                    <span class="text-[8px] sm:text-[10px] font-black text-amber-300 mb-1 truncate whitespace-nowrap">PAY</span>
+                    <button id="btnPay" onclick="payOutCoins()" class="arcade-btn btn-arcade-white w-full py-1.5 sm:py-2.5 px-0.5 sm:px-1 rounded-md font-black text-[10.5px] sm:text-xs">
+                        退幣
+                    </button>
+                </div>
+
+                <!-- WIN ↔ CREDIT (移分/得分) -->
+                <div class="flex flex-col items-center min-w-0">
+                    <span class="text-[7.5px] sm:text-[9px] font-black text-red-400 mb-1 truncate whitespace-nowrap max-w-full">WIN↔CREDIT</span>
+                    <button id="btnWinCreditToggle" onclick="handleWinCreditTransfer()" class="arcade-btn btn-arcade-white w-full py-1.5 sm:py-2.5 px-0.5 sm:px-1 rounded-md font-black text-[10px] sm:text-xs whitespace-nowrap">
+                        收/移分
+                    </button>
+                </div>
+
+                <!-- SMALL 1-6 (押小) -->
+                <div class="flex flex-col items-center min-w-0">
+                    <span class="text-[7.5px] sm:text-[9.5px] font-black text-sky-400 mb-1 truncate whitespace-nowrap max-w-full">SMALL 1-6</span>
+                    <button id="btnGuessSmall" onclick="playDoubleUp('SMALL')" disabled class="arcade-btn btn-arcade-white w-full py-1.5 sm:py-2.5 px-0.5 sm:px-1 rounded-md font-black text-[10.5px] sm:text-xs text-sky-700">
+                        押小
+                    </button>
+                </div>
+
+                <!-- DOUBLE UP BET (比倍) -->
+                <div class="flex flex-col items-center min-w-0">
+                    <span class="text-[7.5px] sm:text-[9px] font-black text-amber-300 mb-1 truncate whitespace-nowrap max-w-full">DOUBLE BET</span>
+                    <button id="btnDoubleMode" onclick="triggerDoubleUpPrompt()" class="arcade-btn btn-arcade-white w-full py-1.5 sm:py-2.5 px-0.5 sm:px-1 rounded-md font-black text-[10.5px] sm:text-xs text-amber-700">
+                        比倍
+                    </button>
+                </div>
+
+                <!-- BIG 8-13 (押大) -->
+                <div class="flex flex-col items-center min-w-0">
+                    <span class="text-[7.5px] sm:text-[9.5px] font-black text-rose-400 mb-1 truncate whitespace-nowrap max-w-full">BIG 8-13</span>
+                    <button id="btnGuessBig" onclick="playDoubleUp('BIG')" disabled class="arcade-btn btn-arcade-white w-full py-1.5 sm:py-2.5 px-0.5 sm:px-1 rounded-md font-black text-[10.5px] sm:text-xs text-rose-700">
+                        押大
+                    </button>
+                </div>
+
+                <!-- START (開始/續押) -->
+                <div class="flex flex-col items-center min-w-0">
+                    <span class="text-[8px] sm:text-[10px] font-black text-blue-400 mb-1 truncate whitespace-nowrap">START</span>
+                    <button id="btnStart" onclick="handleStartButton()" class="arcade-btn btn-blue text-white w-full py-1.5 sm:py-2.5 px-0.5 sm:px-1 rounded-md font-black text-[10.5px] sm:text-xs shadow-[0_3px_0_#1e3a8a] sm:shadow-[0_4px_0_#1e3a8a]">
+                        開始
+                    </button>
+                </div>
+            </div>
+
+            <!-- 第二列：8 門押注實體按鍵盤 (左4門: BAR, 77, 星, 瓜 | 右4門: 鈴, 芒, 橘, 蘋) -->
+            <div class="bg-slate-900/90 p-2 rounded-xl border border-amber-500/50">
+                <div class="flex items-center justify-between text-[11px] text-amber-400 mb-1 px-1">
+                    <span class="font-bold">🕹️ 8 門押注鍵盤（點擊白色按鈕押注，上限 99 分）</span>
+                    <div class="flex gap-1.5">
+                        <button id="btnRepeatBet" onclick="repeatLastBets()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold border border-slate-600 text-[10px]">
+                            🔄 延續上局
+                        </button>
+                        <button id="btnClearBet" onclick="clearCurrentBets()" class="px-2 py-0.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 font-bold border border-rose-700 text-[10px]">
+                            ✖ 退還押分
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 8 顆白色立體押注實體按鈕 (還原實體照) -->
+                <div id="betButtonsTwoRows" class="grid grid-cols-8 gap-1.5 sm:gap-2">
+                    <!-- 由 JS 渲染 8 個圖案名稱與 8 顆白色按鍵 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部退幣口與玩家代幣資訊 + 娃娃禮品兌換所入口 -->
+        <div class="bg-black/85 rounded-xl p-2.5 border border-slate-700 flex items-center justify-between text-xs sm:text-sm relative overflow-hidden flex-wrap gap-2">
+            <div class="flex items-center gap-2 sm:gap-3">
+                <div class="w-11 sm:w-12 h-7 bg-slate-900 border-2 border-slate-600 rounded flex items-center justify-center relative shadow-inner" id="coinTraySlot">
+                    <span class="text-[10px] text-slate-400 font-bold">退幣口</span>
+                </div>
+                <div>
+                    <span class="text-slate-400">玩家代幣：</span>
+                    <span id="playerWalletCoins" class="text-amber-400 font-black text-base">20</span>
+                    <button onclick="addPlayerCoins(20)" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-600 font-bold ml-1 active:scale-95 transition" title="零錢包掏幣 (+20 枚)">+20幣</button>
+                    <span class="text-slate-500 text-[10px] sm:text-xs ml-0.5">(1幣=10分)</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-1.5 sm:gap-2">
+                <!-- 娃娃禮品兌換所按鍵 -->
+                <button onclick="togglePrizeModal(true)" class="arcade-btn px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm flex items-center gap-1 shadow-[0_3px_0_#b45309] active:translate-y-0.5 transition">
+                    <span>🎁 娃娃兌換所</span>
+                    <span id="inventoryBadge" class="bg-rose-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold shadow leading-none">0</span>
+                </button>
+                <button onclick="replenishMachineCoins()" class="text-[11px] sm:text-xs px-2 py-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 font-bold">
+                    🛠️ 補幣
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 娃娃商品兌換所 & 收藏背包 Modal -->
+    <div id="prizeModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden items-center justify-center p-3 sm:p-4">
+        <div class="bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-500 rounded-2xl max-w-xl w-full p-4 sm:p-5 text-slate-200 shadow-2xl max-h-[92vh] flex flex-col relative overflow-hidden">
+            
+            <!-- 彈窗頂部 -->
+            <div class="flex justify-between items-center border-b border-amber-500/40 pb-3 mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">🧸</span>
+                    <div>
+                        <h2 class="text-base sm:text-lg font-black text-amber-400 leading-tight">柑仔店＆娃娃禮品兌換所</h2>
+                        <p class="text-[10px] sm:text-xs text-slate-400">用贏來的實體代幣兌換絕版經典獎品，永久收藏在背包！</p>
+                    </div>
+                </div>
+                <button onclick="togglePrizeModal(false)" class="text-slate-400 hover:text-white text-2xl font-bold px-2 leading-none">✕</button>
+            </div>
+
+            <!-- 代幣餘額與分頁切換列 -->
+            <div class="flex items-center justify-between bg-black/60 p-2 rounded-xl border border-slate-700 mb-3 text-xs">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-slate-400">持有效代幣:</span>
+                    <span id="modalWalletCoins" class="text-amber-400 font-black text-base font-mono">20</span>
+                    <span class="text-slate-400">枚</span>
+                </div>
+                <!-- Tab 切換 -->
+                <div class="flex bg-slate-800 p-0.5 rounded-lg border border-slate-600">
+                    <button id="tabBtnShop" onclick="switchPrizeTab('shop')" class="px-3 py-1 rounded-md font-bold text-xs bg-amber-500 text-slate-950 transition">
+                        🎁 禮品商城
+                    </button>
+                    <button id="tabBtnBag" onclick="switchPrizeTab('bag')" class="px-3 py-1 rounded-md font-bold text-xs text-slate-300 hover:text-white transition flex items-center gap-1">
+                        <span>🎒 我的背包</span>
+                        <span id="modalBagCount" class="bg-amber-600 text-white text-[9px] px-1 rounded-full">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 分頁 1：禮品兌換商城 -->
+            <div id="prizeShopView" class="overflow-y-auto pr-1 flex-1 space-y-2.5">
+                <div id="prizeListContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <!-- 由 JS 動態渲染 8 大商品 -->
+                </div>
+            </div>
+
+            <!-- 分頁 2：我的收藏背包 (支援 LocalStorage 儲存) -->
+            <div id="prizeBagView" class="overflow-y-auto pr-1 flex-1 hidden">
+                <div id="inventoryContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <!-- 由 JS 動態渲染已收藏的商品 -->
+                </div>
+                <div id="emptyBagNotice" class="hidden flex-col items-center justify-center py-12 text-slate-400 text-center">
+                    <span class="text-4xl mb-2">🎒</span>
+                    <p class="font-bold text-sm">目前背包空空如也！</p>
+                    <p class="text-xs text-slate-500 mt-1">快在機台上退幣賺代幣，把喜歡的瑪莉歐娃娃帶回家吧！</p>
+                </div>
+            </div>
+
+            <!-- 彈窗底部快捷操作 -->
+            <div class="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                <span>💾 商品與代幣將自動永久保存在本地瀏覽器</span>
+                <button onclick="togglePrizeModal(false)" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg border border-slate-600">
+                    返回遊戲
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 說明手冊 Modal -->
+    <div id="helpModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-amber-500 rounded-2xl max-w-lg w-full p-5 text-slate-200 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+                <h2 class="text-lg sm:text-xl font-black text-amber-400">🎰 小瑪莉（麻仔台）操作與按鍵說明</h2>
+                <button onclick="toggleHelpModal(false)" class="text-slate-400 hover:text-white text-xl font-bold px-2">✕</button>
+            </div>
+            <div class="space-y-3 text-xs sm:text-sm leading-relaxed">
+                <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                    <h3 class="font-bold text-amber-300 mb-1">🎯 遊戲基本玩法</h3>
+                    <ol class="list-decimal list-inside space-y-1 text-slate-300">
+                        <li><b>投幣與押分</b>：點擊「投幣」或「開分」增加可用分數（CREDIT），接著點擊下方 8 種水果/圖案進行押分。</li>
+                        <li><b>啟動跑燈</b>：按下 <span class="text-red-400 font-bold">START</span> 啟動外圍 24 格跑馬燈，停在有押注的圖案即按賠率獲得 WIN 分數（停在歸零或幸運草有送燈特效！）。</li>
+                        <li><b>比大小（比倍）</b>：中獎後可點擊「DOUBLE 比大小鍵」或直接選「押小 (1~6)」、「押大 (8~13)」。開出 <b>7 為保送（翻倍過關）</b>！</li>
+                    </ol>
+                </div>
+
+                <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                    <h3 class="font-bold text-amber-300 mb-2">🕹️ 主要按鍵與限制說明</h3>
+                    <ul class="space-y-1.5 text-slate-300">
+                        <li><b class="text-red-400">START（開始鍵）</b>：押注後啟動跑燈；若未改押分直接按壓，會自動延續上一局押注值直接開始。若有贏分未收，按 START 會自動先收分。</li>
+                        <li><b class="text-yellow-400">DOUBLE UP / BET（比大小）</b>：中獎後進入 1~13 點數比倍模式。</li>
+                        <li><b class="text-emerald-400">WIN / CREDIT（左/右移分鍵）</b>：將贏分收進可用區（◀得分），或在<b>無押分狀態</b>下將分數移至贏分區（移分▶）。</li>
+                        <li><b class="text-amber-300">PAY（退幣鍵）</b>：在無押分狀態下，將剩餘分數轉換為硬幣退出（機台內剩餘硬幣需大於等於退幣量才可正常退幣）。</li>
+                        <li><b class="text-slate-200">開分鍵 / 消分鍵</b>：每按一次 +100 分 / -100 分（<b>嚴格限制需在無押分狀態下操作</b>）。</li>
+                        <li><b class="text-rose-400">電源開關</b>：控制主機台開啟與關閉，當機或想重置機台時可關機再重開。</li>
+                    </ul>
+                </div>
+
+                <div class="bg-slate-800/80 p-3 rounded-xl border border-cyan-800/60">
+                    <h3 class="font-bold text-cyan-300 mb-1">💧 水箱機制與咬度演算法說明</h3>
+                    <ul class="space-y-1 text-slate-300">
+                        <li><b>水箱水位</b>：玩家每局押分的 95% 會注入機台水箱。水箱充足時，大獎（BAR、77、星星）與幸運送燈（ONCE MORE）開出率大幅提高！</li>
+                        <li><b>吐分期 (RTP 98%)</b>：水箱放水，送燈機率提高至 15~20%，且送 3~4 燈機率極大。</li>
+                        <li><b>標準街機 (RTP 92%)</b>：原汁原味街機咬度，水箱充飽即吐獎。</li>
+                        <li><b>吃分期 (RTP 80%)</b>：機台保護水箱，優先開出小獎或玩家未押注之圖案。</li>
+                    </ul>
+                </div>
+            </div>
+            <button onclick="toggleHelpModal(false)" class="mt-4 w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl transition">
+                開始遊玩！
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 8 大經典押注圖案定義（由高賠率至低賠率，還原 pic.jpg）
+        const SYMBOLS = [
+            { id: 'BAR',    name: 'BAR',  icon: '🎰', odds: 100, color: 'from-amber-600 to-red-600' },
+            { id: 'SEVEN',  name: '77',   icon: '7️⃣', odds: 40,  color: 'from-rose-500 to-red-700' },
+            { id: 'STAR',   name: '雙星', icon: '⭐', odds: 30,  color: 'from-amber-400 to-yellow-600' },
+            { id: 'MELON',  name: '西瓜', icon: '🍉', odds: 20,  color: 'from-emerald-500 to-green-700' },
+            { id: 'BELL',   name: '鈴鐺', icon: '🔔', odds: 20,  color: 'from-yellow-400 to-amber-600' },
+            { id: 'MANGO',  name: '芒果', icon: '🥭', odds: 15,  color: 'from-orange-400 to-amber-600' },
+            { id: 'ORANGE', name: '橘子', icon: '🍊', odds: 10,  color: 'from-orange-500 to-red-600' },
+            { id: 'APPLE',  name: '蘋果', icon: '🍎', odds: 5,   color: 'from-red-500 to-rose-700' }
+        ];
+
+        // 24 格經典順時針跑馬燈配置 (0 ~ 23，1:1 對齊實體照 pic.jpg)
+        const BOARD_TILES = [
+            // 上排 (左至右 0~6)
+            { sym: 'ORANGE', label: '橘子', mult: 10, icon: '🍊', ledPos: 'bottom' },
+            { sym: 'BELL',   label: '鈴鐺', mult: 20, icon: '🔔', ledPos: 'bottom' },
+            { sym: 'BAR',    label: 'X50 BAR', mult: 50, icon: '🎰', special: 'bar', ledPos: 'bottom' },
+            { sym: 'BAR',    label: 'BAR', mult: 100, icon: '👑', special: 'bar', ledPos: 'bottom' },
+            { sym: 'BAR',    label: 'X25 BAR', mult: 25, icon: '🎰', special: 'bar', ledPos: 'bottom' },
+            { sym: 'APPLE',  label: '蘋果', mult: 5,  icon: '🍎', ledPos: 'bottom' },
+            { sym: 'MANGO',  label: '芒果', mult: 15, icon: '🥭', ledPos: 'bottom' },
+            // 右排 (上至下 7~11)
+            { sym: 'MELON',  label: '西瓜', mult: 20, icon: '🍉', ledPos: 'left' },
+            { sym: 'MELON',  label: '西瓜 X2', mult: 2, icon: '🍉', isSmall: true, ledPos: 'left' },
+            { sym: 'LUCKY',  label: 'ONCE MORE', mult: 0, icon: '🍀', special: 'lucky-green', ledPos: 'left' },
+            { sym: 'APPLE',  label: '蘋果', mult: 5,  icon: '🍎', ledPos: 'left' },
+            { sym: 'ORANGE', label: '橘子 X2', mult: 2, icon: '🍊', isSmall: true, ledPos: 'left' },
+            // 下排 (右至左 12~18)
+            { sym: 'ORANGE', label: '橘子', mult: 10, icon: '🍊', ledPos: 'top' },
+            { sym: 'BELL',   label: '鈴鐺', mult: 20, icon: '🔔', ledPos: 'top' },
+            { sym: 'SEVEN',  label: '7 X2', mult: 2, icon: '7️⃣', isSmall: true, ledPos: 'top' },
+            { sym: 'SEVEN',  label: '77', mult: 40, icon: '7️⃣', ledPos: 'top' },
+            { sym: 'APPLE',  label: '蘋果', mult: 5,  icon: '🍎', ledPos: 'top' },
+            { sym: 'MANGO',  label: '芒果 X2', mult: 2, icon: '🥭', isSmall: true, ledPos: 'top' },
+            { sym: 'MANGO',  label: '芒果', mult: 15, icon: '🥭', ledPos: 'top' },
+            // 左排 (下至上 19~23)
+            { sym: 'STAR',   label: '雙星', mult: 30, icon: '⭐', ledPos: 'right' },
+            { sym: 'STAR',   label: '雙星 X2', mult: 2, icon: '⭐', isSmall: true, ledPos: 'right' },
+            { sym: 'LUCKY',  label: 'ONCE MORE', mult: 0, icon: '🍀', special: 'lucky-red', ledPos: 'right' },
+            { sym: 'APPLE',  label: '蘋果', mult: 5,  icon: '🍎', ledPos: 'right' },
+            { sym: 'BELL',   label: '鈴鐺 X2', mult: 2, icon: '🔔', isSmall: true, ledPos: 'right' }
+        ];
+
+        // 24 格對應在 7x7 Grid 中的 (row, col) 1-based 座標
+        const GRID_COORDS = [
+            [1,1], [1,2], [1,3], [1,4], [1,5], [1,6], [1,7], // 0-6 上排
+            [2,7], [3,7], [4,7], [5,7], [6,7],               // 7-11 右排
+            [7,7], [7,6], [7,5], [7,4], [7,3], [7,2], [7,1], // 12-18 下排
+            [6,1], [5,1], [4,1], [3,1], [2,1]                // 19-23 左排
+        ];
+
+        // 娃娃商品目錄定義 (8 大懷舊經典獎品)
+        const PRIZE_CATALOG = [
+            {
+                id: 'doll_mario',
+                name: '復古瑪莉歐毛絨娃娃',
+                icon: '🧸',
+                price: 50,
+                rarity: '稀有',
+                badgeColor: 'bg-red-900/80 text-red-200 border-red-500',
+                desc: '30公分經典紅色背帶褲刺繡玩偶，手感綿密扎實。'
+            },
+            {
+                id: 'doll_yoshi',
+                name: '耀西綠恐龍坐姿公仔',
+                icon: '🦖',
+                price: 80,
+                rarity: '稀有',
+                badgeColor: 'bg-emerald-900/80 text-emerald-200 border-emerald-500',
+                desc: '大眼睛軟膠公仔，按壓肚子會發出軟萌啾啾聲！'
+            },
+            {
+                id: 'cushion_mushroom',
+                name: '無敵超大紅蘑菇抱枕',
+                icon: '🍄',
+                price: 120,
+                rarity: '史詩',
+                badgeColor: 'bg-rose-900/80 text-rose-200 border-rose-500',
+                desc: '超柔軟記憶棉抱枕，象徵吃下就能長大無敵！'
+            },
+            {
+                id: 'figure_bowser',
+                name: '庫巴大魔王限量霸氣手辦',
+                icon: '👑',
+                price: 200,
+                rarity: '傳奇',
+                badgeColor: 'bg-amber-900/80 text-amber-200 border-amber-500',
+                desc: '全金屬塗裝、尖刺龜殼可拆卸，街機廳鎮店之寶！'
+            },
+            {
+                id: 'candy_box',
+                name: '柑仔店懷舊口哨糖大禮包',
+                icon: '🍬',
+                price: 15,
+                rarity: '普通',
+                badgeColor: 'bg-pink-950 text-pink-200 border-pink-600',
+                desc: '可以吹出響亮口哨的古早味硬糖，童年滿滿回憶。'
+            },
+            {
+                id: 'keychain_arcade',
+                name: '迷你小瑪莉發光鑰匙圈',
+                icon: '🎮',
+                price: 30,
+                rarity: '精美',
+                badgeColor: 'bg-blue-900/80 text-blue-200 border-blue-500',
+                desc: '按鍵會閃紅燈並發出原汁原味小瑪莉跑燈電子音！'
+            },
+            {
+                id: 'toy_shell',
+                name: '綠龜殼迴力發條小車',
+                icon: '🐢',
+                price: 40,
+                rarity: '精美',
+                badgeColor: 'bg-teal-900/80 text-teal-200 border-teal-500',
+                desc: '拉後放手迅速向前衝刺旋轉，好玩又療癒。'
+            },
+            {
+                id: 'trophy_gold',
+                name: '純金小瑪莉麻仔台賭神金盃',
+                icon: '🏆',
+                price: 500,
+                rarity: '神話',
+                badgeColor: 'bg-yellow-800 text-yellow-100 border-yellow-400',
+                desc: '刻有「麻仔台大亨」字樣的榮譽獎盃，全場最尊貴！'
+            }
+        ];
+
+        // 讀取本地代幣與已兌換商品背包 (預設口袋至少有 20 枚代幣)
+        function getSavedWalletCoins() {
+            const val = localStorage.getItem('smallmari_wallet_coins');
+            const parsed = val !== null ? parseInt(val, 10) : 20;
+            return isNaN(parsed) || parsed <= 0 ? 20 : parsed;
+        }
+
+        function saveWalletCoins() {
+            localStorage.setItem('smallmari_wallet_coins', state.walletCoins);
+            const modalWallet = document.getElementById('modalWalletCoins');
+            if (modalWallet) modalWallet.textContent = state.walletCoins;
+        }
+
+        function getSavedInventory() {
+            try {
+                const raw = localStorage.getItem('smallmari_inventory');
+                return raw ? JSON.parse(raw) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveInventory(inv) {
+            localStorage.setItem('smallmari_inventory', JSON.stringify(inv));
+            updateInventoryBadges();
+        }
+
+        // 遊戲狀態變數
+        let state = {
+            powerOn: true,
+            muted: false,
+            credit: 100,         // 可用分數
+            win: 0,              // 贏得分數
+            walletCoins: getSavedWalletCoins(), // 玩家持有代幣 (支援本地儲存持久化)
+            machineCoins: 500,   // 機台內部硬幣存量 (檢查退幣是否足夠)
+            currentPos: 0,       // 目前跑馬燈停留位置 (0~23)
+            isSpinning: false,   // 是否正在跑燈中
+            isDoubleRolling: false, // 是否正在比大小跳號中
+            doubleModeActive: false, // 是否處於比大小提示高亮狀態
+            diceNumber: 7,       // 比大小顯示數字 (1~13)
+            bets: { BAR: 0, SEVEN: 0, STAR: 0, MELON: 0, BELL: 0, MANGO: 0, ORANGE: 0, APPLE: 0 },
+            lastBets: { BAR: 0, SEVEN: 0, STAR: 0, MELON: 0, BELL: 0, MANGO: 0, ORANGE: 0, APPLE: 0 }
+        };
+
+        // 街機水箱與咬度演算法配置 (Core Arcade Algorithm)
+        let tankConfig = {
+            mode: 'standard',     // 'loose' (大吐分期), 'standard' (標準街機), 'tight' (大咬分期)
+            waterPool: 300,       // 水箱目前累積分數
+            houseEdgeRatio: 0.05, // 5% 抽水固定利潤
+            totalBetHistory: 0,
+            totalWinHistory: 0
+        };
+
+        function changeDifficulty(mode) {
+            tankConfig.mode = mode;
+            const modeNames = { loose: '吐分期 (RTP 98%)', standard: '標準街機 (RTP 92%)', tight: '吃分期 (RTP 80%)' };
+            setStatus(`⚙️ 咬度切換：【${modeNames[mode]}】已生效`);
+            playTone(660, 0.08, 'triangle');
+            updateTankDisplays();
+        }
+
+        function quickFillWater() {
+            tankConfig.waterPool += 200;
+            playTone(880, 0.1, 'square');
+            setStatus('💧 已為水箱注入 +200 分！大獎與送燈機率顯著提高');
+            updateTankDisplays();
+        }
+
+        function updateTankDisplays() {
+            const poolEl = document.getElementById('displayWaterPool');
+            const rtpEl = document.getElementById('displayRTP');
+            if (poolEl) poolEl.textContent = tankConfig.waterPool;
+            if (rtpEl) {
+                if (tankConfig.totalBetHistory === 0) {
+                    rtpEl.textContent = '0.0%';
+                } else {
+                    const rtp = ((tankConfig.totalWinHistory / tankConfig.totalBetHistory) * 100).toFixed(1);
+                    rtpEl.textContent = `${rtp}%`;
+                }
+            }
+        }
+
+        // 核心演算法：基於水箱水位與咬度的動態加權選格 (Weighted Target Selection)
+        function calculateTargetIndex() {
+            const weights = [];
+
+            for (let i = 0; i < 24; i++) {
+                const tile = BOARD_TILES[i];
+                let w = 10; // 基準權重
+
+                // 1. LUCKY / ONCE MORE (送燈) 特殊權重
+                if (tile.sym === 'LUCKY') {
+                    if (tankConfig.mode === 'loose') {
+                        w = 18; // 吐分期送燈率極高 (~15-20%)
+                    } else if (tankConfig.mode === 'tight') {
+                        w = 3;  // 吃分期極難送燈 (~3-5%)
+                    } else {
+                        w = 9;  // 標準街機 (~8-10%)
+                    }
+                    // 水箱充裕時送燈權重加成
+                    if (tankConfig.waterPool >= 300) w += 5;
+                    else if (tankConfig.waterPool < 100) w = Math.max(1, w - 4);
+                } else {
+                    // 2. 一般圖案格權重
+                    const betAmt = state.bets[tile.sym] || 0;
+                    const payout = betAmt * tile.mult;
+
+                    if (payout === 0) {
+                        // 玩家未押注該圖案 (機台安全出獎)
+                        if (tankConfig.mode === 'tight') {
+                            w = 25; // 咬分期偏好停在未押格
+                        } else if (tankConfig.mode === 'loose') {
+                            w = 4;  // 吐分期盡量不開空包彈
+                        } else {
+                            w = 12; // 標準
+                        }
+                    } else {
+                        // 玩家有押注該圖案 (需由水箱賠付)
+                        if (payout <= tankConfig.waterPool) {
+                            // 水箱有充足點數賠付
+                            if (tankConfig.mode === 'loose') {
+                                w = 22; // 吐分期極力吐大獎
+                            } else if (tankConfig.mode === 'tight') {
+                                w = tile.isSmall ? 8 : 4; // 咬分期抑制大賠率
+                            } else {
+                                // 標準：水箱越滿，出獎意願越高
+                                w = 8 + Math.min(10, Math.floor(tankConfig.waterPool / 50));
+                            }
+                        } else {
+                            // 水箱水位不足！機台保護機制啟動
+                            if (tankConfig.mode === 'loose') {
+                                w = 5;
+                            } else if (tankConfig.mode === 'tight') {
+                                w = 0.5; // 嚴防爆池
+                            } else {
+                                w = 2;
+                            }
+                        }
+
+                        // 小獎 (X2) 提供適度過渡甜頭
+                        if (tile.isSmall) {
+                            w += 3;
+                        }
+                    }
+                }
+
+                weights.push(Math.max(0.1, w));
+            }
+
+            // 輪盤抽樣演算法 (Roulette Wheel Selection)
+            const sumWeight = weights.reduce((acc, v) => acc + v, 0);
+            let rand = Math.random() * sumWeight;
+            for (let i = 0; i < 24; i++) {
+                rand -= weights[i];
+                if (rand <= 0) {
+                    return i;
+                }
+            }
+            return Math.floor(Math.random() * 24);
+        }
+
+        // Web Audio API 復古街機音效合成器
+        let audioCtx = null;
+        function ensureAudio() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) audioCtx = new AudioContextClass();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTone(freq, duration = 0.06, type = 'square', volume = 0.12) {
+            if (state.muted || !state.powerOn) return;
+            try {
+                ensureAudio();
+                if (!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                // 忽略未互動前的音效例外
+            }
+        }
+
+        function playMelody(notes) {
+            if (state.muted || !state.powerOn) return;
+            let delay = 0;
+            notes.forEach(([freq, dur, type]) => {
+                setTimeout(() => {
+                    if (state.powerOn) playTone(freq, dur, type || 'square', 0.15);
+                }, delay * 1000);
+                delay += dur * 0.9;
+            });
+        }
+
+        function initBoardUI() {
+            const grid = document.getElementById('boardGrid');
+            // 清除舊格子但保留中央控制台
+            Array.from(grid.querySelectorAll('.slot-cell')).forEach(el => el.remove());
+
+            BOARD_TILES.forEach((tile, idx) => {
+                const [r, c] = GRID_COORDS[idx];
+                const cell = document.createElement('div');
+                let extraClass = 'text-slate-900 ';
+                if (tile.special === 'bar') extraClass += 'special-bar ';
+                else if (tile.special === 'lucky-green') extraClass += 'special-lucky-green ';
+                else if (tile.special === 'lucky-red') extraClass += 'special-lucky-red ';
+
+                cell.id = `tile-${idx}`;
+                cell.className = `slot-cell ${extraClass} flex flex-col items-center justify-center p-0.5 select-none relative`;
+                cell.style.gridRow = r;
+                cell.style.gridColumn = c;
+
+                // 決定內緣紅色圓形 LED 指示燈之絕對定位
+                let ledClass = '';
+                if (idx === 0) {
+                    ledClass = 'bottom-1 right-1';
+                } else if (idx === 6) {
+                    ledClass = 'bottom-1 left-1';
+                } else if (idx === 12) {
+                    ledClass = 'top-1 left-1';
+                } else if (idx === 18) {
+                    ledClass = 'top-1 right-1';
+                } else if (tile.ledPos === 'bottom') {
+                    ledClass = 'bottom-0.5 left-1/2 -translate-x-1/2';
+                } else if (tile.ledPos === 'top') {
+                    ledClass = 'top-0.5 left-1/2 -translate-x-1/2';
+                } else if (tile.ledPos === 'left') {
+                    ledClass = 'left-0.5 top-1/2 -translate-y-1/2';
+                } else if (tile.ledPos === 'right') {
+                    ledClass = 'right-0.5 top-1/2 -translate-y-1/2';
+                }
+
+                // 標記倍數與文字樣式
+                let labelHtml = '';
+                if (tile.special && tile.special.startsWith('lucky')) {
+                    const textColor = tile.special === 'lucky-red' ? 'text-red-600' : 'text-emerald-700';
+                    labelHtml = `
+                        <div class="text-xs sm:text-xl leading-none my-0.5">${tile.icon}</div>
+                        <div class="text-[8px] sm:text-[9px] font-black leading-none ${textColor} tracking-tighter">ONCE</div>
+                        <div class="text-[8px] sm:text-[9px] font-black leading-none ${textColor} tracking-tighter">MORE</div>
+                    `;
+                } else {
+                    const badgeText = tile.mult > 0 ? (tile.isSmall ? 'X2' : `x${tile.mult}`) : '送燈';
+                    labelHtml = `
+                        <div class="text-sm sm:text-2xl leading-none my-0.5">${tile.icon}</div>
+                        <div class="text-[8px] sm:text-[10px] font-black leading-tight text-slate-800 truncate max-w-full">${tile.label}</div>
+                        <span class="text-[8px] sm:text-[9px] font-black leading-none px-1 rounded bg-black/80 text-amber-300">${badgeText}</span>
+                    `;
+                }
+
+                cell.innerHTML = `
+                    ${labelHtml}
+                    <!-- 格子內緣圓形紅色實體 LED 指示燈 -->
+                    <div class="slot-led absolute ${ledClass}"></div>
+                `;
+                grid.appendChild(cell);
+            });
+
+            // 渲染正下方 8 大圖案官方賠率與七段 LED 押分顯示條 (還原實體照)
+            const oddsBar = document.getElementById('oddsLedDisplayBar');
+            oddsBar.innerHTML = '';
+            SYMBOLS.forEach(sym => {
+                const col = document.createElement('div');
+                col.className = 'flex flex-col items-center bg-slate-950 p-1 rounded-lg border border-amber-600/60';
+                col.innerHTML = `
+                    <div class="text-[9px] sm:text-[11px] font-black text-amber-300 leading-none mb-0.5">${sym.odds}</div>
+                    <div class="flex items-center gap-1 my-0.5">
+                        <div id="oddsLed-${sym.id}" class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-950 border border-black"></div>
+                        <span class="text-xs sm:text-base leading-none">${sym.icon}</span>
+                    </div>
+                    <div id="betDisplay-${sym.id}" class="seven-seg w-full text-center text-sm sm:text-lg py-0.5 rounded font-bold">
+                        00
+                    </div>
+                `;
+                oddsBar.appendChild(col);
+            });
+
+            // 渲染實體按鍵操作台：第二列 8 門押注按鍵 (還原實體照)
+            const betButtonsContainer = document.getElementById('betButtonsTwoRows');
+            betButtonsContainer.innerHTML = '';
+            SYMBOLS.forEach(sym => {
+                const col = document.createElement('div');
+                col.className = 'flex flex-col items-center gap-1';
+                col.innerHTML = `
+                    <div class="flex flex-col items-center justify-center bg-slate-800 text-slate-200 border border-slate-600 rounded px-0.5 py-1 w-full text-center">
+                        <span class="text-sm sm:text-xl leading-none">${sym.icon}</span>
+                        <span class="text-[8px] sm:text-[9px] font-black text-amber-300 leading-none mt-0.5">${sym.name}</span>
+                    </div>
+                    <button id="betBtn-${sym.id}" onclick="placeBet('${sym.id}')" class="arcade-btn btn-arcade-white w-full py-2 sm:py-2.5 rounded-md font-black text-[10px] sm:text-xs text-slate-900 shadow">
+                        押注
+                    </button>
+                `;
+                betButtonsContainer.appendChild(col);
+            });
+
+            highlightTile(state.currentPos);
+            updateAllDisplays();
+        }
+
+        // WIN ↔ CREDIT 移分/收分共用按鍵處理
+        function handleWinCreditTransfer() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+            if (state.win > 0) {
+                // 有贏分時：執行收分 (WIN -> CREDIT)
+                transferWinToCredit();
+            } else {
+                // 無贏分且無押分時：執行移分 (CREDIT -> WIN 準備比倍)
+                transferCreditToWin();
+            }
+        }
+
+        function getTotalBet() {
+            return Object.values(state.bets).reduce((acc, v) => acc + v, 0);
+        }
+
+        function getLastTotalBet() {
+            return Object.values(state.lastBets).reduce((acc, v) => acc + v, 0);
+        }
+
+        function setStatus(mainText, subText = null, highlight = false) {
+            const banner = document.getElementById('statusBanner');
+            const sub = document.getElementById('subStatusText');
+            banner.textContent = mainText;
+            if (highlight) {
+                banner.classList.add('animate-blink', 'text-yellow-300');
+            } else {
+                banner.classList.remove('animate-blink', 'text-yellow-300');
+            }
+            if (subText !== null) {
+                sub.textContent = subText;
+            }
+        }
+
+        function highlightTile(pos, extraPositions = []) {
+            for (let i = 0; i < 24; i++) {
+                const el = document.getElementById(`tile-${i}`);
+                if (!el) continue;
+                if (state.powerOn && (i === pos || extraPositions.includes(i))) {
+                    el.classList.add('active-light');
+                } else {
+                    el.classList.remove('active-light');
+                }
+            }
+        }
+
+        function updateAllDisplays() {
+            const winEl = document.getElementById('displayWin');
+            const credEl = document.getElementById('displayCredit');
+            const diceEl = document.getElementById('displayDice');
+
+            if (!state.powerOn) {
+                // 關機狀態：所有數位管數值全部歸零
+                winEl.textContent = '00000';
+                credEl.textContent = '00000';
+                diceEl.textContent = '00';
+                SYMBOLS.forEach(sym => {
+                    const el = document.getElementById(`betDisplay-${sym.id}`);
+                    if (el) el.textContent = '00';
+                    const oddsLed = document.getElementById(`oddsLed-${sym.id}`);
+                    if (oddsLed) oddsLed.className = 'w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-950 border border-black';
+                });
+                return;
+            }
+
+            winEl.textContent = String(state.win).padStart(5, '0');
+            credEl.textContent = String(state.credit).padStart(5, '0');
+            diceEl.textContent = String(state.diceNumber).padStart(2, '0');
+
+            SYMBOLS.forEach(sym => {
+                const el = document.getElementById(`betDisplay-${sym.id}`);
+                if (el) el.textContent = String(state.bets[sym.id]).padStart(2, '0');
+                const oddsLed = document.getElementById(`oddsLed-${sym.id}`);
+                if (oddsLed) {
+                    if (state.win > 0 && BOARD_TILES[state.currentPos] && BOARD_TILES[state.currentPos].sym === sym.id) {
+                        oddsLed.className = 'w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] border border-white animate-pulse';
+                    } else {
+                        oddsLed.className = 'w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-950 border border-black';
+                    }
+                }
+            });
+
+            document.getElementById('playerWalletCoins').textContent = state.walletCoins;
+            document.getElementById('machineCoinStock').textContent = `機內硬幣: ${state.machineCoins}`;
+
+            // 動態更新 WIN↔CREDIT 按鍵文字提示
+            const btnToggle = document.getElementById('btnWinCreditToggle');
+            if (btnToggle) {
+                if (state.win > 0) {
+                    btnToggle.innerHTML = '<span class="text-emerald-700 font-black animate-pulse">◀ 收分</span>';
+                } else {
+                    btnToggle.innerHTML = '<span class="text-slate-800">移分 ▶</span>';
+                }
+            }
+
+            // 控制比大小按鈕啟用狀態
+            const canDouble = state.powerOn && !state.isSpinning && !state.isDoubleRolling && state.win > 0;
+            const btnSmall = document.getElementById('btnGuessSmall');
+            const btnBig = document.getElementById('btnGuessBig');
+            const btnDouble = document.getElementById('btnDoubleMode');
+
+            btnSmall.disabled = !canDouble;
+            btnBig.disabled = !canDouble;
+
+            if (canDouble && state.doubleModeActive) {
+                btnSmall.classList.add('animate-blink', 'ring-2', 'ring-sky-400');
+                btnBig.classList.add('animate-blink', 'ring-2', 'ring-rose-400');
+                btnDouble.classList.add('ring-2', 'ring-amber-400');
+            } else {
+                btnSmall.classList.remove('animate-blink', 'ring-2', 'ring-sky-400');
+                btnBig.classList.remove('animate-blink', 'ring-2', 'ring-rose-400');
+                btnDouble.classList.remove('ring-2', 'ring-amber-400');
+            }
+        }
+
+        // 1. 投幣 (+10 分) - 保證點投幣口永遠能順暢投幣
+        function insertCoin() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+            
+            // 若玩家口袋代幣為 0，自動掏出 20 枚代幣補充，絕不卡死
+            if (state.walletCoins <= 0) {
+                state.walletCoins = 20;
+                saveWalletCoins();
+                playMelody([[523, 0.05], [784, 0.08]]);
+                setStatus('👛 零錢袋已自動掏出 20 枚代幣！');
+            }
+
+            state.walletCoins -= 1;
+            state.machineCoins += 1;
+            state.credit += 10;
+            saveWalletCoins();
+            playMelody([[987, 0.06], [1318, 0.12]]);
+            setStatus('🪙 投入 1 枚代幣，可用分數 +10 分！');
+            updateAllDisplays();
+        }
+
+        // 手動補充玩家代幣 (+20 枚)
+        function addPlayerCoins(amt = 20) {
+            state.walletCoins += amt;
+            saveWalletCoins();
+            playTone(880, 0.08, 'triangle');
+            setStatus(`🪙 成功領取 ${amt} 枚代幣！目前口袋共有 ${state.walletCoins} 枚代幣`);
+            updateAllDisplays();
+        }
+
+        // 2. 開分鍵 (每按一次 +100 分，需在無押分狀態操作)
+        function keyInScore() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+            if (getTotalBet() > 0) {
+                playTone(160, 0.25, 'sawtooth');
+                setStatus('⚠️ 限制：開分鍵需在「無押分狀態」下操作！', '請先按「退還押分」歸零押注後再開分');
+                return;
+            }
+            state.credit = Math.min(99999, state.credit + 100);
+            playMelody([[523, 0.05], [659, 0.05], [784, 0.08], [1046, 0.12]]);
+            setStatus('🔑 開分成功！可用分數 +100 分');
+            updateAllDisplays();
+        }
+
+        // 3. 消分鍵 (每按一次 -100 分，需在無押分狀態操作)
+        function keyOutScore() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+            if (getTotalBet() > 0) {
+                playTone(160, 0.25, 'sawtooth');
+                setStatus('⚠️ 限制：消分鍵需在「無押分狀態」下操作！', '請先按「退還押分」歸零押注後再消分');
+                return;
+            }
+            if (state.credit <= 0) {
+                playTone(160, 0.2, 'sawtooth');
+                setStatus('⚠️ 目前可用分數為 0，無法消分！');
+                return;
+            }
+            const deduct = Math.min(100, state.credit);
+            state.credit -= deduct;
+            playMelody([[880, 0.06], [659, 0.06], [440, 0.12]]);
+            setStatus(`🗝️ 消分完成！已扣除 ${deduct} 分`);
+            updateAllDisplays();
+        }
+
+        // 4. WIN -> CREDIT 得分鍵 (將贏分收回可用分數)
+        function transferWinToCredit() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+            if (state.win <= 0) {
+                playTone(220, 0.12, 'sawtooth');
+                setStatus('目前 WIN 贏分區沒有分數可收！');
+                return;
+            }
+            state.doubleModeActive = false;
+            const amount = state.win;
+            state.credit += amount;
+            state.win = 0;
+            playMelody([[587, 0.05], [784, 0.05], [987, 0.06], [1174, 0.12]]);
+            setStatus(`💰 已將贏分 ${amount} 分轉入 CREDIT 可用分數區！`);
+            updateAllDisplays();
+        }
+
+        // 5. CREDIT -> WIN 右移分鍵 (需在無押分狀態下操作)
+        function transferCreditToWin() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+            if (getTotalBet() > 0) {
+                playTone(160, 0.25, 'sawtooth');
+                setStatus('⚠️ 限制：右移分需在「無押分狀態」下操作！');
+                return;
+            }
+            if (state.credit <= 0) {
+                playTone(160, 0.2, 'sawtooth');
+                setStatus('⚠️ CREDIT 可用分數不足，無法移分！');
+                return;
+            }
+            const transferStep = Math.min(10, state.credit);
+            state.credit -= transferStep;
+            state.win += transferStep;
+            playTone(740, 0.07, 'square');
+            setStatus(`▶ 已移分 ${transferStep} 分至 WIN 區（可進行比大小或按◀得分收回）`);
+            updateAllDisplays();
+        }
+
+        // 6. PAY 退幣鍵 (需在無押分狀態，且機內硬幣需大於等於退幣數量)
+        function payOutCoins() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+            if (getTotalBet() > 0) {
+                playTone(160, 0.25, 'sawtooth');
+                setStatus('⚠️ 請先清除押分後再按 PAY 退幣結算！');
+                return;
+            }
+            // 先把未收的 WIN 併入結算計算
+            const totalScore = state.credit + state.win;
+            if (totalScore < 10) {
+                playTone(180, 0.2, 'sawtooth');
+                setStatus('⚠️ 總分數未滿 10 分（1枚代幣 = 10分），無法退幣！');
+                return;
+            }
+            const coinsToPay = Math.floor(totalScore / 10);
+            if (state.machineCoins < coinsToPay) {
+                playMelody([[200, 0.15, 'sawtooth'], [150, 0.25, 'sawtooth']]);
+                setStatus(`🚨 機台硬幣不足！（需退 ${coinsToPay} 枚，機內僅剩 ${state.machineCoins} 枚）`, '請點擊右下角「🛠️ 補滿機內硬幣」後再按 PAY 退幣');
+                return;
+            }
+
+            // 執行退幣
+            const remainder = totalScore % 10;
+            state.win = 0;
+            state.credit = remainder;
+            state.machineCoins -= coinsToPay;
+            state.walletCoins += coinsToPay;
+            state.doubleModeActive = false;
+            saveWalletCoins();
+
+            spawnCoinDropAnimation(Math.min(coinsToPay, 12));
+            playMelody([[1046, 0.07], [1318, 0.07], [1567, 0.08], [2093, 0.18]]);
+            setStatus(`🪙 退幣成功！共退出 ${coinsToPay} 枚代幣（折合 ${coinsToPay * 10} 分）`);
+            updateAllDisplays();
+        }
+
+        function spawnCoinDropAnimation(count) {
+            const slot = document.getElementById('coinTraySlot');
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => {
+                    const coin = document.createElement('div');
+                    coin.className = 'coin-particle absolute text-sm pointer-events-none';
+                    coin.textContent = '🪙';
+                    coin.style.left = `${10 + Math.random() * 20}px`;
+                    slot.appendChild(coin);
+                    setTimeout(() => coin.remove(), 650);
+                }, i * 70);
+            }
+        }
+
+        function replenishMachineCoins() {
+            if (!state.powerOn) return;
+            state.machineCoins += 500;
+            playTone(880, 0.1, 'triangle');
+            setStatus('🛠️ 已為機台補充 500 枚硬幣！可以正常退幣。');
+            updateAllDisplays();
+        }
+
+        function placeBet(symId) {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+
+            // 如果還有上一局贏分未收，自動先轉入 CREDIT 方便玩家直接押注
+            if (state.win > 0) {
+                state.credit += state.win;
+                state.win = 0;
+                state.doubleModeActive = false;
+            }
+
+            if (state.credit <= 0) {
+                playTone(180, 0.2, 'sawtooth');
+                setStatus('⚠️ 可用分數不足！請先點擊上方「🪙投幣」或「🔑開分(+100)」');
+                return;
+            }
+            if (state.bets[symId] >= 99) {
+                playTone(250, 0.1, 'sawtooth');
+                setStatus('⚠️ 單一圖案押分上限為 99 分！');
+                return;
+            }
+
+            state.credit -= 1;
+            state.bets[symId] += 1;
+
+            // 依照圖案給予不同音高回饋
+            const idx = SYMBOLS.findIndex(s => s.id === symId);
+            playTone(440 + idx * 65, 0.05, 'square');
+            setStatus(`🍒 已押注【${SYMBOLS[idx].name}】(${state.bets[symId]} 分)，總押分：${getTotalBet()} 分`);
+            updateAllDisplays();
+        }
+
+        function clearCurrentBets() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+            const total = getTotalBet();
+            if (total === 0) return;
+            state.credit += total;
+            Object.keys(state.bets).forEach(k => state.bets[k] = 0);
+            playTone(330, 0.1, 'triangle');
+            setStatus('✖ 已退還本局所有押分至 CREDIT 區（目前為無押分狀態）');
+            updateAllDisplays();
+        }
+
+        function repeatLastBets() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+            const lastTotal = getLastTotalBet();
+            if (lastTotal === 0) {
+                playTone(200, 0.15, 'sawtooth');
+                setStatus('⚠️ 尚無上一局的押分紀錄可延續！');
+                return;
+            }
+            // 先退回當前押注
+            const currentTotal = getTotalBet();
+            state.credit += currentTotal;
+            Object.keys(state.bets).forEach(k => state.bets[k] = 0);
+
+            if (state.credit + state.win < lastTotal) {
+                playTone(180, 0.2, 'sawtooth');
+                setStatus(`⚠️ 分數不足以延續上局押注（需 ${lastTotal} 分）！`);
+                updateAllDisplays();
+                return false;
+            }
+
+            if (state.win > 0) {
+                state.credit += state.win;
+                state.win = 0;
+            }
+
+            Object.keys(state.lastBets).forEach(k => {
+                state.bets[k] = state.lastBets[k];
+            });
+            state.credit -= lastTotal;
+            playMelody([[587, 0.05], [880, 0.08]]);
+            setStatus(`🔄 已自動延續上一局押分（共 ${lastTotal} 分）！`);
+            updateAllDisplays();
+            return true;
+        }
+
+        function handleStartButton() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+
+            // 若有贏分未收且未押分，先將贏分收進 CREDIT
+            if (state.win > 0 && getTotalBet() === 0) {
+                transferWinToCredit();
+                return;
+            }
+
+            // 若有贏分同時又已經押好分，先把贏分併入 CREDIT
+            if (state.win > 0) {
+                state.credit += state.win;
+                state.win = 0;
+                state.doubleModeActive = false;
+            }
+
+            // 檢查是否有押注；若沒改押分，依據規則「再次按壓會延續上一局的押注值直接開始」
+            if (getTotalBet() === 0) {
+                if (getLastTotalBet() > 0) {
+                    const ok = repeatLastBets();
+                    if (!ok) return;
+                } else {
+                    playTone(180, 0.2, 'sawtooth');
+                    setStatus('⚠️ 請先在下方選擇水果或圖案進行押分！');
+                    return;
+                }
+            }
+
+            // 儲存本局押注供下一局延續使用
+            Object.keys(state.bets).forEach(k => {
+                state.lastBets[k] = state.bets[k];
+            });
+
+            startMarqueeSpin();
+        }
+
+        function startMarqueeSpin() {
+            state.isSpinning = true;
+            state.doubleModeActive = false;
+            updateAllDisplays();
+
+            // 水箱累計進帳：本局押分進入水箱池（扣除 5% 固定抽水）
+            const currentTotalBet = getTotalBet();
+            tankConfig.waterPool += Math.round(currentTotalBet * (1 - tankConfig.houseEdgeRatio));
+            tankConfig.totalBetHistory += currentTotalBet;
+            updateTankDisplays();
+
+            // 核心演算法：透過加權選格演算法決定本局目標格
+            const targetIndex = calculateTargetIndex();
+            const fullLaps = 3 + Math.floor(Math.random() * 2);
+            const stepsToTarget = (targetIndex - state.currentPos + 24) % 24;
+            const totalSteps = fullLaps * 24 + stepsToTarget;
+
+            let currentStep = 0;
+            setStatus('🚨 跑馬燈轉動中... 祝您中大獎！', '外圍跑燈停在有押注的圖案即可獲得對應倍數分數');
+
+            function stepLoop() {
+                if (!state.powerOn) return; // 若中途關機立即中斷
+
+                state.currentPos = (state.currentPos + 1) % 24;
+                currentStep++;
+                highlightTile(state.currentPos);
+
+                // 跑燈音效隨位置高高低低
+                const pitch = 320 + (state.currentPos % 12) * 35;
+                playTone(pitch, 0.035, 'square', 0.09);
+
+                if (currentStep < totalSteps) {
+                    // 計算加減速曲線 (開頭加速、中間高速、結尾慢速停頓)
+                    const remaining = totalSteps - currentStep;
+                    let delay = 32;
+                    if (currentStep < 8) {
+                        delay = 110 - currentStep * 10;
+                    } else if (remaining <= 14) {
+                        delay = 40 + Math.pow(15 - remaining, 1.85) * 6;
+                    }
+                    setTimeout(stepLoop, delay);
+                } else {
+                    // 抵達終點
+                    setTimeout(() => evaluateSpinResult(state.currentPos), 250);
+                }
+            }
+
+            stepLoop();
+        }
+
+        function evaluateSpinResult(landedIndex) {
+            if (!state.powerOn) return;
+            const landedTile = BOARD_TILES[landedIndex];
+
+            // 若停在 LUCKY / ONCE MORE（例如格 9 綠色字 ONCE MORE 或格 21），觸發經典「逐次送燈」特效！
+            if (landedTile.sym === 'LUCKY') {
+                triggerLuckyBonus(landedIndex, false);
+                return;
+            }
+
+            // 一般圖案結算
+            const betAmt = state.bets[landedTile.sym] || 0;
+            if (betAmt > 0) {
+                const prize = betAmt * landedTile.mult;
+                finishRoundCalculation(prize, [`${landedTile.label} x${landedTile.mult}`], false);
+            } else {
+                finishRoundCalculation(0, [], false);
+            }
+        }
+
+        // 經典 ONCE MORE 逐次送 1~5 燈機制 (循序逐燈射出、逐一定格鎖定)
+        function triggerLuckyBonus(landedIndex, isTest = false) {
+            if (!state.powerOn) return;
+            const landedTile = BOARD_TILES[landedIndex];
+            
+            // 播放經典送燈激勵前奏音效
+            playMelody([[523, 0.08], [659, 0.08], [784, 0.08], [1046, 0.16], [1318, 0.22]]);
+            
+            // 隨機決定送燈數量：1~5 個燈 (受街機咬度模式微調權重，但保證在 1~5 燈區間)
+            let bonusCount = 1;
+            if (tankConfig.mode === 'loose') {
+                // 吐分期偏多燈 (2~5 燈)
+                const r = Math.random();
+                if (r < 0.15) bonusCount = 2;
+                else if (r < 0.45) bonusCount = 3;
+                else if (r < 0.75) bonusCount = 4;
+                else bonusCount = 5;
+            } else if (tankConfig.mode === 'tight') {
+                // 吃分期偏少燈 (1~3 燈)
+                const r = Math.random();
+                if (r < 0.50) bonusCount = 1;
+                else if (r < 0.85) bonusCount = 2;
+                else bonusCount = 3;
+            } else {
+                // 標準模式：1~5 燈全隨機均勻分佈
+                bonusCount = 1 + Math.floor(Math.random() * 5);
+            }
+
+            // 挑選送燈目標格子（排除兩格 LUCKY，當水箱水位充盈且玩家有押注時，適度偏向玩家押注格提升體感）
+            const candidateIndices = [];
+            for (let r = 0; r < 24; r++) {
+                if (BOARD_TILES[r].sym !== 'LUCKY') {
+                    candidateIndices.push(r);
+                }
+            }
+
+            const bonusTargets = [];
+            const tempCandidates = [...candidateIndices];
+            while (bonusTargets.length < bonusCount && tempCandidates.length > 0) {
+                const betCandidates = tempCandidates.filter(idx => (state.bets[BOARD_TILES[idx].sym] || 0) > 0);
+                let pickIdx = -1;
+                if (betCandidates.length > 0 && tankConfig.waterPool >= 120 && Math.random() < 0.65) {
+                    pickIdx = betCandidates[Math.floor(Math.random() * betCandidates.length)];
+                } else {
+                    pickIdx = tempCandidates[Math.floor(Math.random() * tempCandidates.length)];
+                }
+                bonusTargets.push(pickIdx);
+                const removeIdx = tempCandidates.indexOf(pickIdx);
+                if (removeIdx !== -1) tempCandidates.splice(removeIdx, 1);
+            }
+
+            const prefix = isTest ? '【測試】' : '';
+            setStatus(`🍀 ${prefix}停在【${landedTile.label}】！觸發幸運送燈，即將逐次送出 ${bonusCount} 個燈！`, '每個燈逐一跑出並定格鎖定，請屏息以待...', true);
+
+            // 鎖定燈陣列：起始先鎖定 ONCE MORE 格保持長亮
+            const lockedLamps = [landedIndex];
+            highlightTile(landedIndex, lockedLamps);
+
+            let currentLampIdx = 0;
+            let currentFromPos = landedIndex;
+
+            // 循序執行單顆燈的跑動與煞停（逐次跑燈，絕不一次彈出）
+            function runNextLamp() {
+                if (!state.powerOn) return; // 關機中斷
+
+                if (currentLampIdx >= bonusTargets.length) {
+                    // 所有送燈全數逐次跑完，進入最終結算
+                    finalizeBonusRound(bonusTargets, bonusCount);
+                    return;
+                }
+
+                const targetPos = bonusTargets[currentLampIdx];
+                const lampOrder = currentLampIdx + 1;
+                setStatus(`✨ 正在送出第 ${lampOrder} / ${bonusCount} 顆燈...`, `目標尋找中，已鎖定 ${lockedLamps.length} 顆燈！`, true);
+
+                // 每一顆燈至少繞 1 圈 (24 步) 加上相對差值步數，呈現經典麻仔台跑燈感
+                const diff = (targetPos - currentFromPos + 24) % 24;
+                const totalSteps = 24 + diff;
+                let step = 0;
+                let pointerPos = currentFromPos;
+
+                function singleLampStep() {
+                    if (!state.powerOn) return;
+
+                    pointerPos = (pointerPos + 1) % 24;
+                    step++;
+
+                    // 高亮正在移動的指針，並同時恆亮維持所有先前已定格鎖定的燈（含 ONCE MORE）
+                    highlightTile(pointerPos, lockedLamps);
+
+                    // 射燈短跑清脆音效
+                    const pitch = 480 + (pointerPos % 12) * 35;
+                    playTone(pitch, 0.03, 'square', 0.08);
+
+                    if (step < totalSteps) {
+                        const remaining = totalSteps - step;
+                        let delay = 32;
+                        if (step < 5) {
+                            delay = 70 - step * 8;
+                        } else if (remaining <= 10) {
+                            // 煞停減速曲線
+                            delay = 35 + Math.pow(11 - remaining, 1.8) * 5;
+                        }
+                        setTimeout(singleLampStep, delay);
+                    } else {
+                        // 抵達目標格子，鎖定定格！
+                        lockedLamps.push(targetPos);
+                        currentFromPos = targetPos;
+                        highlightTile(targetPos, lockedLamps);
+
+                        // 定格叮咚音效
+                        playMelody([[880, 0.08], [1174, 0.16]]);
+                        const landedSymbol = BOARD_TILES[targetPos];
+                        const betAmt = state.bets[landedSymbol.sym] || 0;
+                        const hitMsg = betAmt > 0 ? ` (押中 x${landedSymbol.mult}！)` : '';
+
+                        setStatus(
+                            `🎯 第 ${lampOrder} / ${bonusCount} 顆燈命中【${landedSymbol.label}】${hitMsg}！`,
+                            lampOrder < bonusCount ? '稍候片刻，即將跑出下一顆燈...' : '所有送燈全數完成！準備結算...',
+                            true
+                        );
+
+                        currentLampIdx++;
+                        // 間隔 480ms 停頓，讓玩家看清定格結果，再跑下一顆燈
+                        setTimeout(runNextLamp, 480);
+                    }
+                }
+
+                // 延遲 250ms 後開跑這顆燈
+                setTimeout(singleLampStep, 250);
+            }
+
+            // 700ms 後正式啟動第 1 顆燈
+            setTimeout(runNextLamp, 700);
+        }
+
+        // 送燈總結算與彩金派發
+        function finalizeBonusRound(bonusTargets, bonusCount) {
+            let totalWin = 0;
+            const hitNames = [];
+            bonusTargets.forEach(idx => {
+                const t = BOARD_TILES[idx];
+                const betAmt = state.bets[t.sym] || 0;
+                if (betAmt > 0) {
+                    const prize = betAmt * t.mult;
+                    totalWin += prize;
+                    hitNames.push(`${t.label}(x${t.mult})`);
+                }
+            });
+
+            if (totalWin > 0) {
+                playMelody([[523, 0.08], [659, 0.08], [784, 0.08], [1046, 0.18], [1318, 0.25]]);
+            }
+
+            finishRoundCalculation(totalWin, hitNames, true);
+        }
+
+        // 單純測試 ONCE MORE 送燈功能 (預設完全隱藏於暗碼 885 店家後台)
+        function testShootLights() {
+            if (!state.powerOn) {
+                togglePower();
+            }
+            if (state.isSpinning) {
+                setStatus('⚠️ 機台目前正在轉動或送燈中，請稍候！');
+                return;
+            }
+
+            // 若目前毫無押注，自動幫忙配置測試押注（各門押 1 分）以便完整展示得分與結算
+            let currentTotal = getTotalBet();
+            if (currentTotal === 0) {
+                if (state.credit < 8) state.credit += 50;
+                SYMBOLS.forEach(s => {
+                    state.bets[s.id] = 1;
+                    state.credit -= 1;
+                });
+                updateAllDisplays();
+                setStatus('🎯 已自動配置測試押注（各門押 1 分）！');
+            }
+
+            state.isSpinning = true;
+            state.doubleModeActive = false;
+
+            // 定位在格 9 (綠色字 ONCE MORE)
+            const greenOnceMorePos = 9;
+            state.currentPos = greenOnceMorePos;
+            highlightTile(greenOnceMorePos);
+
+            setStatus('🍀【測試模式】命中綠色【ONCE MORE】！準備逐次送出 1~5 個燈...', '各燈逐一跑動定格', true);
+            playMelody([[523, 0.08], [659, 0.08], [784, 0.08], [1046, 0.15]]);
+
+            setTimeout(() => {
+                triggerLuckyBonus(greenOnceMorePos, true);
+            }, 600);
+        }
+
+        function finishRoundCalculation(wonScore, hitDescriptions, isLuckyBonus) {
+            // 本局結束後清空押分面板（但已保存在 lastBets 供下局一鍵續玩）
+            Object.keys(state.bets).forEach(k => state.bets[k] = 0);
+            state.isSpinning = false;
+
+            if (wonScore > 0) {
+                // 水箱出帳吐分
+                tankConfig.waterPool = Math.max(0, tankConfig.waterPool - wonScore);
+                tankConfig.totalWinHistory += wonScore;
+                updateTankDisplays();
+
+                state.win += wonScore;
+                state.doubleModeActive = true;
+                playMelody([[523, 0.08], [659, 0.08], [784, 0.08], [1046, 0.15], [784, 0.08], [1046, 0.25]]);
+                setStatus(
+                    `🎉 中獎！【${hitDescriptions.join(' + ')}】贏得 ${wonScore} 分！`,
+                    '可選擇「押小(1~6) / 押大(8~13)」比倍，或按「◀得分」收下分數',
+                    true
+                );
+            } else {
+                updateTankDisplays();
+                playMelody([[300, 0.12, 'sawtooth'], [220, 0.2, 'sawtooth']]);
+                const extraMsg = isLuckyBonus ? '可惜幸運送燈未命中您押注的水果' : `停在【${BOARD_TILES[state.currentPos].label}】，未押中`;
+                setStatus(
+                    `😢 ${extraMsg}，再接再厲！`,
+                    '直接按「START」可自動延續上一局押注開始，或重新押分'
+                );
+            }
+
+            updateAllDisplays();
+        }
+
+        function triggerDoubleUpPrompt() {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling) return;
+            if (state.win <= 0) {
+                playTone(180, 0.2, 'sawtooth');
+                setStatus('⚠️ 需在「中獎有贏分 (WIN > 0)」時才可進入比大小模式！', '您也可以在無押分時按「移分▶」將分數移至 WIN 區比倍');
+                return;
+            }
+            state.doubleModeActive = true;
+            playMelody([[659, 0.06], [880, 0.1]]);
+            setStatus(
+                `🎲 比大小模式啟動！目前賭注 ${state.win} 分`,
+                '請點擊中央「🔉押小 (1~6)」或「🔊押大 (8~13)」，開出 7 保送翻倍！',
+                true
+            );
+            updateAllDisplays();
+        }
+
+        function playDoubleUp(choice) {
+            if (!state.powerOn || state.isSpinning || state.isDoubleRolling || state.win <= 0) return;
+
+            state.isDoubleRolling = true;
+            state.doubleModeActive = false;
+            updateAllDisplays();
+
+            const choiceName = choice === 'SMALL' ? '小 (1~6)' : '大 (8~13)';
+            setStatus(`🎲 比倍跳號中... 您選擇了【押${choiceName}】！`);
+
+            let ticks = 0;
+            const maxTicks = 18;
+            const rollInterval = setInterval(() => {
+                if (!state.powerOn) {
+                    clearInterval(rollInterval);
+                    return;
+                }
+                state.diceNumber = 1 + Math.floor(Math.random() * 13);
+                document.getElementById('displayDice').textContent = String(state.diceNumber).padStart(2, '0');
+                playTone(500 + (state.diceNumber * 40), 0.03, 'square', 0.08);
+                ticks++;
+
+                if (ticks >= maxTicks) {
+                    clearInterval(rollInterval);
+                    const finalNum = 1 + Math.floor(Math.random() * 13);
+                    state.diceNumber = finalNum;
+                    state.isDoubleRolling = false;
+                    resolveDoubleUpResult(choice, finalNum);
+                }
+            }, 55);
+        }
+
+        function resolveDoubleUpResult(choice, finalNum) {
+            // 規則：1~6 為小、7 為保送、8~13 為大
+            let isWin = false;
+            let isSevenPushBonus = false;
+
+            if (finalNum === 7) {
+                isWin = true;
+                isSevenPushBonus = true;
+            } else if (choice === 'SMALL' && finalNum >= 1 && finalNum <= 6) {
+                isWin = true;
+            } else if (choice === 'BIG' && finalNum >= 8 && finalNum <= 13) {
+                isWin = true;
+            }
+
+            if (isWin) {
+                state.win *= 2;
+                state.doubleModeActive = true;
+                playMelody([[587, 0.07], [784, 0.07], [987, 0.07], [1174, 0.22]]);
+                if (isSevenPushBonus) {
+                    setStatus(
+                        `🌟 開出幸運數字【07 保送】！獎金直接翻倍為 ${state.win} 分！`,
+                        '可繼續選擇「押小 / 押大」挑戰更高倍數，或按「◀得分」收下！',
+                        true
+                    );
+                } else {
+                    const sizeTag = finalNum <= 6 ? '小' : '大';
+                    setStatus(
+                        `🔥 猜中了！開出【${String(finalNum).padStart(2, '0')} (${sizeTag})】，贏分翻倍為 ${state.win} 分！`,
+                        '可繼續押大/押小翻倍，或按「◀得分」將獎金存入 CREDIT！',
+                        true
+                    );
+                }
+            } else {
+                const sizeTag = finalNum <= 6 ? '小' : '大';
+                state.win = 0;
+                state.doubleModeActive = false;
+                playMelody([[280, 0.15, 'sawtooth'], [190, 0.3, 'sawtooth']]);
+                setStatus(
+                    `💥 可惜！開出【${String(finalNum).padStart(2, '0')} (${sizeTag})】，比倍失敗獎金歸零！`,
+                    '按下 START 可直接沿用上局押注再戰一局'
+                );
+            }
+
+            updateAllDisplays();
+        }
+
+        function togglePower() {
+            state.powerOn = !state.powerOn;
+            const root = document.getElementById('machineRoot');
+            const ind = document.getElementById('powerIndicator');
+
+            if (!state.powerOn) {
+                // 關機狀態：停止所有動作，所有數值全部重置為 0
+                state.isSpinning = false;
+                state.isDoubleRolling = false;
+                state.doubleModeActive = false;
+                state.win = 0;
+                state.credit = 0;
+                state.diceNumber = 0;
+                state.currentPos = 0;
+                Object.keys(state.bets).forEach(k => state.bets[k] = 0);
+                Object.keys(state.lastBets).forEach(k => state.lastBets[k] = 0);
+
+                root.classList.add('power-off');
+                ind.className = 'w-2 h-2 rounded-full bg-red-600 shadow-[0_0_8px_#dc2626]';
+                highlightTile(-1); // 熄滅跑馬燈
+                setStatus('🔌 主機電源已關閉（所有數值已全部重置為 0）', '再次按下左上角「電源」開關即可重新開機');
+                updateAllDisplays();
+            } else {
+                // 重新開機：執行經典街機開機自檢，所有數值歸零起始
+                root.classList.remove('power-off');
+                ind.className = 'w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]';
+                state.win = 0;
+                state.credit = 0;
+                state.currentPos = 0;
+                state.diceNumber = 7;
+                Object.keys(state.bets).forEach(k => state.bets[k] = 0);
+                Object.keys(state.lastBets).forEach(k => state.lastBets[k] = 0);
+
+                highlightTile(state.currentPos);
+                playMelody([[440, 0.06], [554, 0.06], [659, 0.06], [880, 0.15]]);
+                setStatus('⚡ 系統重開機完成！所有數值已歸零，請先投幣或開分', '請點擊「🪙投幣(+10)」或「🔑開分(+100)」');
+                updateAllDisplays();
+            }
+        }
+
+        function toggleMute() {
+            state.muted = !state.muted;
+            const btn = document.getElementById('btnMute');
+            btn.textContent = state.muted ? '🔇 靜音' : '🔊 音效';
+        }
+
+        function toggleHelpModal(show) {
+            const modal = document.getElementById('helpModal');
+            if (show) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        // 隱藏管理員暗碼系統 (預設密碼 885，不顯示輸入介面)
+        let secretCodeBuffer = '';
+        let secretCodeTimer = null;
+        let powerClickCount = 0;
+        let powerClickTimer = null;
+        const ADMIN_SECRET_CODE = '885';
+
+        function checkSecretPasscode(char) {
+            secretCodeBuffer += char;
+            clearTimeout(secretCodeTimer);
+            // 2.5 秒內若未繼續輸入自動清空緩衝區（全程無螢幕提示，保持絕對隱密）
+            secretCodeTimer = setTimeout(() => {
+                secretCodeBuffer = '';
+            }, 2500);
+
+            if (secretCodeBuffer.endsWith(ADMIN_SECRET_CODE)) {
+                secretCodeBuffer = '';
+                toggleAdminPanel();
+            }
+        }
+
+        function toggleAdminPanel(forceState) {
+            const bar = document.getElementById('tankMonitorBar');
+            const scoreGroup = document.getElementById('adminScoreButtons');
+            if (!bar) return;
+            const willShow = forceState !== undefined ? forceState : bar.classList.contains('hidden');
+            if (willShow) {
+                bar.classList.remove('hidden');
+                if (scoreGroup) {
+                    scoreGroup.classList.remove('hidden');
+                    scoreGroup.classList.add('flex');
+                }
+                updateTankDisplays();
+                playMelody([[523, 0.06], [659, 0.06], [784, 0.06], [1046, 0.15]]);
+                setStatus('🔓 暗碼正確！店家專用管理面板與【開分/消分】已開啟', null, true);
+            } else {
+                bar.classList.add('hidden');
+                if (scoreGroup) {
+                    scoreGroup.classList.add('hidden');
+                    scoreGroup.classList.remove('flex');
+                }
+                playTone(330, 0.1, 'sawtooth');
+                setStatus('🔒 店家監控面板與【開分/消分】已鎖定隱藏');
+            }
+        }
+
+        // 行動裝置/觸控螢幕暗門：快速連點 3 次電源開關彈出暗碼輸入框
+        function handlePowerClick() {
+            powerClickCount++;
+            clearTimeout(powerClickTimer);
+            powerClickTimer = setTimeout(() => {
+                togglePower();
+                powerClickCount = 0;
+            }, 320);
+
+            if (powerClickCount >= 3) {
+                clearTimeout(powerClickTimer);
+                powerClickCount = 0;
+                promptMobileSecret();
+            }
+        }
+
+        function promptMobileSecret() {
+            const code = prompt('【店家後台】請輸入管理暗碼：');
+            if (code === ADMIN_SECRET_CODE) {
+                toggleAdminPanel(true);
+            } else if (code !== null) {
+                playTone(180, 0.2, 'sawtooth');
+                setStatus('⚠️ 暗碼錯誤！');
+            }
+        }
+
+        // 支援鍵盤快捷鍵操作（Space 啟動、左右鍵比大小、Enter 收分、盲打 885 暗碼）
+        window.addEventListener('keydown', (e) => {
+            // 監聽數字鍵暗碼輸入 (主鍵盤 0-9 或小鍵盤 Numpad0-9)
+            let numChar = null;
+            if (e.key >= '0' && e.key <= '9') {
+                numChar = e.key;
+            } else if (e.code.startsWith('Numpad') && e.code.length === 7) {
+                numChar = e.code.replace('Numpad', '');
+            }
+            if (numChar) {
+                checkSecretPasscode(numChar);
+            }
+
+            if (!state.powerOn) return;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                handleStartButton();
+            } else if (e.code === 'ArrowLeft' && state.win > 0) {
+                playDoubleUp('SMALL');
+            } else if (e.code === 'ArrowRight' && state.win > 0) {
+                playDoubleUp('BIG');
+            } else if (e.code === 'Enter' && state.win > 0) {
+                transferWinToCredit();
+            }
+        });
+
+        // 人氣街機訪客計數與即時在線人數連動系統
+        function initVisitorCounter() {
+            // 1. 累計造訪人次 (本地累加 + 免費 Counter API 支援)
+            const seedKey = 'smallmari_visit_count';
+            let localCount = parseInt(localStorage.getItem(seedKey) || '15820', 10) + 1;
+            localStorage.setItem(seedKey, localCount);
+            
+            const visitEl = document.getElementById('totalVisitorsCount');
+            if (visitEl) visitEl.textContent = Number(localCount).toLocaleString();
+
+            // 嘗試連線非同步計數 (若離線或受阻自動平滑降級)
+            fetch('https://api.counterapi.dev/v1/smallmari_arcade_tw/visits/up')
+                .then(res => res.json())
+                .then(data => {
+                    if (data && typeof data.count === 'number') {
+                        const total = 15820 + data.count;
+                        if (visitEl) visitEl.textContent = total.toLocaleString();
+                    }
+                })
+                .catch(() => {});
+
+            // 2. 即時在線玩家人數擬真波動演算法 (160 ~ 250 人動態起伏)
+            let currentOnline = 175 + Math.floor(Math.random() * 25);
+            const onlineEl = document.getElementById('livePlayersCount');
+            if (onlineEl) onlineEl.textContent = currentOnline;
+
+            setInterval(() => {
+                const delta = Math.floor(Math.random() * 7) - 3; // -3 ~ +3
+                currentOnline = Math.max(145, Math.min(285, currentOnline + delta));
+                if (onlineEl) onlineEl.textContent = currentOnline;
+            }, 4500);
+        }
+
+        // 娃娃禮品商城與收藏背包系統 (支援 LocalStorage 持久化)
+        function togglePrizeModal(show) {
+            const modal = document.getElementById('prizeModal');
+            if (!modal) return;
+            if (show) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                const modalWallet = document.getElementById('modalWalletCoins');
+                if (modalWallet) modalWallet.textContent = state.walletCoins;
+                renderPrizeShop();
+                renderInventoryBag();
+                updateInventoryBadges();
+                playTone(660, 0.08, 'triangle');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function switchPrizeTab(tab) {
+            const shopView = document.getElementById('prizeShopView');
+            const bagView = document.getElementById('prizeBagView');
+            const tabShop = document.getElementById('tabBtnShop');
+            const tabBag = document.getElementById('tabBtnBag');
+
+            if (tab === 'shop') {
+                shopView.classList.remove('hidden');
+                bagView.classList.add('hidden');
+                tabShop.className = 'px-3 py-1 rounded-md font-bold text-xs bg-amber-500 text-slate-950 transition';
+                tabBag.className = 'px-3 py-1 rounded-md font-bold text-xs text-slate-300 hover:text-white transition flex items-center gap-1';
+                renderPrizeShop();
+            } else {
+                shopView.classList.add('hidden');
+                bagView.classList.remove('hidden');
+                tabBag.className = 'px-3 py-1 rounded-md font-bold text-xs bg-amber-500 text-slate-950 transition flex items-center gap-1';
+                tabShop.className = 'px-3 py-1 rounded-md font-bold text-xs text-slate-300 hover:text-white transition';
+                renderInventoryBag();
+            }
+        }
+
+        function updateInventoryBadges() {
+            const inv = getSavedInventory();
+            const totalCount = inv.reduce((sum, item) => sum + item.count, 0);
+            const badge = document.getElementById('inventoryBadge');
+            const modalCount = document.getElementById('modalBagCount');
+            if (badge) badge.textContent = totalCount;
+            if (modalCount) modalCount.textContent = totalCount;
+        }
+
+        function renderPrizeShop() {
+            const container = document.getElementById('prizeListContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            PRIZE_CATALOG.forEach(prize => {
+                const canAfford = state.walletCoins >= prize.price;
+                const card = document.createElement('div');
+                card.className = `bg-slate-950/90 p-3 rounded-xl border border-slate-700 hover:border-amber-500/60 flex flex-col justify-between transition relative overflow-hidden shadow-md`;
+                card.innerHTML = `
+                    <div class="flex items-start gap-2.5">
+                        <div class="text-3xl sm:text-4xl bg-slate-900 border border-slate-700 rounded-xl p-2 flex items-center justify-center shrink-0">
+                            ${prize.icon}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-1 mb-1">
+                                <h4 class="font-black text-xs sm:text-sm text-amber-300 truncate">${prize.name}</h4>
+                                <span class="text-[9px] px-1.5 py-0.2 rounded border font-bold ${prize.badgeColor}">${prize.rarity}</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400 line-clamp-2 leading-relaxed mb-1.5">${prize.desc}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 mt-1">
+                        <div class="flex items-center gap-1 font-mono">
+                            <span class="text-sm">🪙</span>
+                            <span class="font-black text-xs sm:text-sm ${canAfford ? 'text-amber-400' : 'text-slate-500'}">${prize.price} 枚代幣</span>
+                        </div>
+                        <button onclick="redeemPrize('${prize.id}')" ${!canAfford ? 'disabled' : ''} class="arcade-btn px-3 py-1 rounded-lg text-xs font-black transition ${canAfford ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-[0_3px_0_#92400e]' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'}">
+                            ${canAfford ? '立即兌換' : '代幣不足'}
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderInventoryBag() {
+            const container = document.getElementById('inventoryContainer');
+            const emptyNotice = document.getElementById('emptyBagNotice');
+            if (!container || !emptyNotice) return;
+            container.innerHTML = '';
+
+            const inv = getSavedInventory();
+            if (inv.length === 0) {
+                emptyNotice.classList.remove('hidden');
+                emptyNotice.classList.add('flex');
+                return;
+            }
+
+            emptyNotice.classList.add('hidden');
+            emptyNotice.classList.remove('flex');
+
+            inv.forEach(item => {
+                const catalogInfo = PRIZE_CATALOG.find(p => p.id === item.id) || {};
+                const card = document.createElement('div');
+                card.className = `bg-gradient-to-br from-slate-900 to-black p-3 rounded-xl border border-amber-500/50 flex flex-col justify-between shadow-lg relative cursor-pointer hover:border-amber-400 transition active:scale-[0.98]`;
+                card.onclick = () => interactItem(item.id);
+                card.innerHTML = `
+                    <div class="flex items-start gap-2.5">
+                        <div class="text-3xl sm:text-4xl bg-amber-950/40 border border-amber-500/40 rounded-xl p-2 flex items-center justify-center shrink-0">
+                            ${item.icon}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-1 mb-0.5">
+                                <h4 class="font-black text-xs sm:text-sm text-yellow-300 truncate">${item.name}</h4>
+                                <span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-600 font-bold">x${item.count}</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400 mb-1">${catalogInfo.desc || '經典絕版收藏品'}</p>
+                            <div class="text-[9px] text-slate-500 font-mono">📅 取得: ${item.exchangedAt}</div>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-amber-400">
+                        <span class="text-slate-500">點擊互動把玩</span>
+                        <span class="font-bold">✨ 已永久保存</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function redeemPrize(prizeId) {
+            const prize = PRIZE_CATALOG.find(p => p.id === prizeId);
+            if (!prize) return;
+
+            if (state.walletCoins < prize.price) {
+                playTone(180, 0.2, 'sawtooth');
+                setStatus(`⚠️ 代幣不足！兌換【${prize.name}】需要 ${prize.price} 枚代幣（目前剩餘 ${state.walletCoins} 枚）`);
+                return;
+            }
+
+            // 扣除代幣並持久化至 LocalStorage
+            state.walletCoins -= prize.price;
+            saveWalletCoins();
+
+            // 更新背包並持久化至 LocalStorage
+            const inv = getSavedInventory();
+            const existing = inv.find(p => p.id === prizeId);
+            const now = new Date();
+            const nowStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            if (existing) {
+                existing.count += 1;
+                existing.exchangedAt = nowStr;
+            } else {
+                inv.push({
+                    id: prize.id,
+                    name: prize.name,
+                    icon: prize.icon,
+                    price: prize.price,
+                    exchangedAt: nowStr,
+                    count: 1
+                });
+            }
+            saveInventory(inv);
+
+            // 播放盛大獲獎旋律
+            playMelody([[523, 0.08], [659, 0.08], [784, 0.08], [1046, 0.15], [1318, 0.25]]);
+            setStatus(`🎉 成功兌換【${prize.name}】！已永久收進您的禮品背包！`, null, true);
+
+            updateAllDisplays();
+            renderPrizeShop();
+            renderInventoryBag();
+            updateInventoryBadges();
+        }
+
+        function interactItem(prizeId) {
+            const prize = PRIZE_CATALOG.find(p => p.id === prizeId);
+            if (!prize) return;
+            playMelody([[659, 0.07], [880, 0.07], [1174, 0.15]]);
+            setStatus(`✨ 您開心把玩了【${prize.name}】${prize.icon}！心情大好，好運加倍！`);
+        }
+
+        window.onload = function () {
+            initBoardUI();
+            updateTankDisplays();
+            initVisitorCounter();
+            updateInventoryBadges();
+        };
+    </script>
+</body>
+</html>
